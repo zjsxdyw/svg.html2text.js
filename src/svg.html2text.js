@@ -163,19 +163,16 @@ HtmlHandler.prototype.setText = function() {
 }
 
 SVG.extend(SVG.Text, {
-    html: function (value, options) {
-
-        if (typeof value === 'object') {
-            options = value;
-            value = true;
-        }
+    html: function (value) {
 
         var htmlHandler = this.remember('_htmlHandler') || new HtmlHandler(this);
 
-        htmlHandler.init(value);
+        if (typeof value === 'string') {
+            htmlHandler.init(value);
+            return this;
+        }
 
-        return this;
-
+        return htmlHandler.html;
     }
 });
 })();
