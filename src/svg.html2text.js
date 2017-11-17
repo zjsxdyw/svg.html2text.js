@@ -1,118 +1,31 @@
 ;(function(){
 "use strict";
-var styles = ['font-weight', 'font-size', 'font-style', 'font-family', 'text-decoration', 'color'];
+const styles = ['font-weight', 'font-size', 'font-style', 'font-family', 'text-decoration', 'line-height', 'color'];
+// Get the style of each character
 function dfs(dom, arr, result) {
     if(dom.nodeType === 3) {
-        for(var i = 0, l = dom.data.length; i < l; i++) {
-            result.push({text: dom.data[i], list: [].concat(arr)});
+        let style = {};
+        arr.forEach((obj) => {
+            for(let key in obj) {
+                style[key] = obj[key];
+            }
+        });
+        for(let i = 0, l = dom.data.length; i < l; i++) {
+            result.push({text: dom.data[i], style: style});
         }
         return;
     }
     if(dom.tagName.toLowerCase() !== 'body') {
-        arr.push({
-            tagName: dom.tagName,
-            style: dom.getAttribute('style')
-        });
+        let style = {};
+        for(let i = 0, len = styles.length; i < len; i++) {
+            style[styles[i]] = dom.style[styles[i]];
+        }
+        arr.push(style);
     }
-    for(var i = 0; i < dom.childNodes.length; i++) {
+    for(let i = 0; i < dom.childNodes.length; i++) {
         dfs(dom.childNodes[i], arr, result);
     }
     arr.pop();
-}
-
-function splitText(arr, width) {
-    var curWidth = 0,
-        curMaxHeight = {num: 0},
-        result = [];
-    for(var i = 0, len = arr.length; i < len; i++) {
-        var textSize = getTextSize(arr[i].text, arr[i].list);
-        var newLine = false;
-        if((textSize.width + curWidth) > width) {
-            curWidth = textSize.width;
-            curMaxHeight = {num: textSize.height};
-            newLine = true;
-        } else {
-            curWidth += textSize.width;
-            curMaxHeight.num = Math.max(textSize.height, curMaxHeight.num);
-            newLine = false;
-        }
-        result.push({text: arr[i].text, styles: textSize.styles, newLine: newLine, maxHeight: curMaxHeight});
-    }
-    return result;
-}
-
-function getTextSize(text, arr) {
-    var p, dom;
-    for(var i = 0, len = arr.length; i < len; i++) {
-        var curDom = document.createElement(arr[i].tagName);
-        curDom.setAttribute('style', arr[i].style);
-        curDom.style.visibility = "hidden";
-        if(i === 0) {
-            p = curDom;
-        } else {
-            dom.appendChild(curDom);
-        }
-        dom = curDom;
-    }
-    if(!p) {
-        p = document.createElement('p');
-    }
-    if(!p.lastChild) {
-        dom = document.createElement('span');
-        p.appendChild(dom);
-    }
-    p = p.lastChild;
-    var result = {};
-    result.width = dom.offsetWidth;
-    result.height = dom.offsetWidth;
-    if(text === ' ') {
-        dom.innerHTML = '&nbsp;';
-    } else {
-        dom.textContent = text;
-    }
-    document.body.appendChild(p);
-    result.width = dom.offsetWidth - result.width;
-    result.height = dom.offsetHeight - result.height;
-    result.styles = {};
-    for(var i = 0, key; (key = styles[i]); i++) {
-        result.styles[key] = getStyle(dom, key);
-    }
-    document.body.removeChild(p);
-    return result;
-}
-
-function getStyle(el, styleProp) {
-    var value, defaultView = (el.ownerDocument || document).defaultView;
-    // W3C standard way:
-    if (defaultView && defaultView.getComputedStyle) {
-        // sanitize property name to css notation
-        // (hypen separated words eg. font-Size)
-        styleProp = styleProp.replace(/([A-Z])/g, "-$1").toLowerCase();
-        value = defaultView.getComputedStyle(el, null).getPropertyValue(styleProp);
-        if(styleProp === 'text-decoration' && value.indexOf('none') > -1 && el.parentNode.tagName.toLowerCase() !== 'body') {
-            return getStyle(el.parentNode, styleProp);
-        }
-        return value;
-    } else if (el.currentStyle) { // IE
-        // sanitize property name to camelCase
-        styleProp = styleProp.replace(/\-(\w)/g, function(str, letter) {
-            return letter.toUpperCase();
-        });
-        value = el.currentStyle[styleProp];
-        // convert other units to pixels on IE
-        if (/^\d+(em|pt|%|ex)?$/i.test(value)) { 
-            return (function(value) {
-                var oldLeft = el.style.left, oldRsLeft = el.runtimeStyle.left;
-                el.runtimeStyle.left = el.currentStyle.left;
-                el.style.left = value || 0;
-                value = el.style.pixelLeft + "px";
-                el.style.left = oldLeft;
-                el.runtimeStyle.left = oldRsLeft;
-                return value;
-            })(value);
-        }
-        return value;
-    }
 }
 
 function HtmlHandler(el) {
@@ -121,58 +34,95 @@ function HtmlHandler(el) {
     this.html = '';
     this.tspanArr = [];
     this.result = [];
-    this.curWidth;
+    this.position = {};
+    this.tspans = [];
+    this.bindReset();
 }
 
-HtmlHandler.prototype.init = function(html) {
+HtmlHandler.prototype.set = function(html) {
     if(this.html === html) return;
     this.html = html;
-    var parser = new DOMParser();
-    var htmlDoc = parser.parseFromString(this.html, 'text/html');
+    let parser = new DOMParser();
+    let htmlDoc = parser.parseFromString(this.html, 'text/html');
     this.result = [];
     dfs(htmlDoc.body, [], this.result);
-    this.setText();
+    this.el.fire('reset', true);
 }
 
-HtmlHandler.prototype.setText = function() {
-    var self = this;
-
-    this.el.on('rebuild', function(e) {
-        if(self.curWidth !== this.width() || e.detail) {
-            self.curWidth = this.width()
-            var arr = splitText(self.result, self.curWidth);
-            self.tspanArr = [];
-            this.text(function(add) {
-                for(var i = 0, len = arr.length; i < len; i++) {
-                    var tspan = add.tspan(arr[i].text)
-                        .style(arr[i].styles).fill(arr[i].styles['color']);
-                    if(arr[i] && arr[i].newLine) {
-                        tspan.newLine();
-                        self.tspanArr.push({tspan: tspan, dy: arr[i].maxHeight.num});
-                    }
-                }
-            })
-        }
-        for(var i = 0, len = self.tspanArr.length; i < len; i++) {
-            if(self.tspanArr[i].tspan.dy() !== self.tspanArr[i].dy)
-                self.tspanArr[i].tspan.dy(self.tspanArr[i].dy);
+HtmlHandler.prototype.bindReset = function() {
+    this.el.on('reset', (e) => {
+        let width = this.el.width();
+        if(this.position.width !== width || e.detail) {
+            this.addText(width);
+            this.position.width = width;
         }
     });
+}
+// Create span for each text, add to document.body, and then set the line break by offsetleft
+HtmlHandler.prototype.addText = function(width) {
+    let list = [];
+    let arr = this.result;
+    for(let i = 0, len = arr.length; i < len; i++) {
+        let tag = document.createElement('span');
+        for(let key in arr[i].style) {
+            tag.style[key] = arr[i].style[key];
+        }
+        tag.innerHTML = arr[i].text;
+        list.push(tag);
+    }
+    let p = document.createElement('p');
+    for(let i = 0, len = list.length; i < len; i++) {
+        list[i].id = i;
+        p.appendChild(list[i]);
+    }
+    let div = document.createElement('div');
+    div.style.width = width + 'px';
+    div.style.wordWradiv = 'break-word';
+    div.style.position = 'absolute';
+    div.appendChild(p);
+    document.body.appendChild(div);
 
-    this.el.fire('rebuild', true);
+    if(this.text) {
+        this.el.removeElement(this.text);
+    }
+
+    this.text = this.el.text(function(add) {
+        let arr = p.children;
+        let last;
+        for(let i = 0, len = arr.length; i < len; i++) {
+            let tag = arr[i];
+            let styleObj = {};
+            for(let j = 0, l = styles.length; j < l; j++) {
+                styleObj[styles[j]] = tag.style[styles[j]];
+            }
+            let tspan = add.tspan(tag.innerText).style(styleObj);
+            // If the offsetLeft is zero, set the new line for this tspan
+            if(tag.offsetLeft === 0) {
+                tspan.x(0);
+                tspan.y(tag.offsetTop + parseInt(styleObj['font-size'].replace(/px/, '')));
+            }
+        }
+    });
+    
+    document.body.removeChild(div);
 }
 
-SVG.extend(SVG.Text, {
+SVG.extend(SVG.G, {
     html: function (value) {
 
-        var htmlHandler = this.remember('_htmlHandler') || new HtmlHandler(this);
+        let htmlHandler = this.remember('_htmlHandler') || new HtmlHandler(this);
 
         if (typeof value === 'string') {
-            htmlHandler.init(value);
+            htmlHandler.set(value);
             return this;
         }
 
         return htmlHandler.html;
+    },
+    width: function(width) {
+        let result = this.attr('width', width);
+        if(width) this.fire('reset');
+        return result;
     }
 });
 })();
