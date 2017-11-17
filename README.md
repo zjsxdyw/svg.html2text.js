@@ -4,7 +4,7 @@ An extension of [svg.js](https://github.com/svgdotjs/svg.js) which allows to g e
 
 # Get Started
 
-- Include the script after svg.js and svg.html2text.js into your page
+- Include the script after svg.js into your page:
 
 		<script src="svg.js"></script>
 		<script src="svg.html2text.js"></script>
