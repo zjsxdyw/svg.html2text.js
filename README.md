@@ -22,7 +22,7 @@ Adjust width
 
 
     var draw = SVG('drawing');
-	  var g = draw.group();
+    var g = draw.group();
     g.html('<p><span style="font-size: 32px;">Hello World!</span></p>').width(200);
     
     
