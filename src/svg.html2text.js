@@ -96,6 +96,9 @@ HtmlHandler.prototype.addText = function(width) {
                 styleObj[styles[j]] = tag.style[styles[j]];
             }
             let tspan = add.tspan(tag.innerText).style(styleObj);
+            if(styleObj.color) {
+                tspan.fill(styleObj.color);
+            }
             // If the offsetLeft is zero, set the new line for this tspan
             if(tag.offsetLeft === 0) {
                 tspan.x(0);
