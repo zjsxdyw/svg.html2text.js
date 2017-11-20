@@ -7,7 +7,7 @@ function dfs(dom, arr, result) {
         let style = {};
         arr.forEach((obj) => {
             for(let key in obj) {
-                style[key] = obj[key];
+                style[key] = obj[key] || style[key];
             }
         });
         for(let i = 0, l = dom.data.length; i < l; i++) {
